@@ -1,2 +1,7 @@
 enformer/enformer_venv
+enformer/enformer_venv_cluster
 enformer/__pycache__
+enformer/data
+enformer/cluster
+enformer/scores
+enformer/commands.md
