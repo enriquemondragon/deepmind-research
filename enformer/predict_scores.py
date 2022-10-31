@@ -18,7 +18,7 @@ import re
 import h5py
 
 # command
-# python3 predict_scores.py -v data/CHANGE -f data/hg38.fa -t data/targets_human.txt
+# python3 predict_scores.py -v data/CHANGE -f data/hg38.fa -t data/targets_human.txt -o outdir/
 
 parser = argparse.ArgumentParser(description=' ################ Predict variant scores with Enformer ################', usage='%(prog)s')
 parser.add_argument('-v', '--vcf_file', type=str, required=True, help='file with the genomic variants', dest='vcf_file')
@@ -28,7 +28,7 @@ parser.add_argument('-o', '--out_dir', type=str, required=True, help='Output dir
 
 args = parser.parse_args()
 
-
+#os.environ["CUDA_VISIBLE_DEVICES"]="0"
 print(tf.config.list_physical_devices('GPU'))
 
 #############################################
@@ -176,7 +176,7 @@ def variant_centered_sequences(vcf_file, sequence_length, gzipped=False,
     reference_sequence=FastaStringExtractor(fasta_file))
 
   for variant in variant_generator(vcf_file, gzipped=gzipped):
-    print('VARIANT: ', variant)
+    print('\nVARIANT: ', variant)
     interval = Interval(chr_prefix + variant.chrom,
                         variant.pos, variant.pos)
     print('INTERVAL: ', interval)
@@ -187,10 +187,12 @@ def variant_centered_sequences(vcf_file, sequence_length, gzipped=False,
     reference = seq_extractor.extract(interval, [], anchor=center)
     alternate = seq_extractor.extract(interval, [variant], anchor=center)
 
+    print('REFERENCE (first 100bp): ', reference[0:100])
+    print('ALTERNATE (first 100bp): ', alternate[0:100])
     print('REFERENCE (mid 100bp): ', reference[SEQUENCE_LENGTH//2-50:SEQUENCE_LENGTH//2+50])
     print('ALTERNATE (mid 100bp): ', alternate[SEQUENCE_LENGTH//2-50:SEQUENCE_LENGTH//2+50])
-    print('pos_spaces:',alternate.find('\n'))
-    alternate = alternate.replace('\n', 'N')
+    print('REFERENCE (last 100bp): ', reference[SEQUENCE_LENGTH-100:SEQUENCE_LENGTH])
+    print('ALTERNATE (last 100bp): ', alternate[SEQUENCE_LENGTH-100:SEQUENCE_LENGTH])
     print('num_spaces:',alternate.find('\n'))
     print('ONE HOT REF: ', one_hot_encode(reference))
     print('ONE HOT ALT: ', one_hot_encode(alternate))
@@ -219,7 +221,7 @@ it = variant_centered_sequences(clinvar_vcf, sequence_length=SEQUENCE_LENGTH,
 example_list=[]
 count = 0
 for i, example in enumerate(it):
-    print('count: ', count)
+    print('Done: ', count)
     count = count + 1
     variant_scores = enformer_score_variants_all.predict_on_batch(
         {k: v[tf.newaxis] for k,v in example['inputs'].items()})[0]
@@ -227,28 +229,17 @@ for i, example in enumerate(it):
     variant_scores = {f'{i}_{name[:20]}': score for i, (name, score) in enumerate(zip(df_targets.description, variant_scores))}
     example_list.append({**example['metadata'],
                        **variant_scores})
-    #print('VARIANT SCORE: ', {**example['metadata'],
-    #                   **variant_scores})
-    if i % 2 == 0:
-        print(f'Done {i}')
 
 df = pd.DataFrame(example_list)
 df
-print('DATAFRAME IS: \n', df)
-print('DATAFRAME IS: \n', df['alt'])
+print('\nDATAFRAME IS: \n', df)
 
 #############################################
 # Write output file
 #############################################
 
-#out_path = args.out_dir + 'sad_scores.h5'
-#df.to_hdf(out_path, args.out_dir)
-#out_dir = args.out_dir + 'sad_scores.csv'
-#sad_out = h5py.File('%s/sad.h5' % out_dir, 'w')
-
+# cvs file
 out_path = args.out_dir + 'sad_scores.csv'
 df.to_csv (out_path, index = False, header=True, sep ='\t')
 
-# echo "$opt" | sed -e 's/^"//' -e 's/"$//'
-# sed -e 's/^"//' -e 's/"$//' <<<"$var1" > out_var.txt 
-# sed 's/\"//g' sad_scores.csv
+print('saved!')
